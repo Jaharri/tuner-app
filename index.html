@@ -5,78 +5,135 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chromatic Guitar Tuner</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-        #note { font-size: 48px; font-weight: bold; }
-        #frequency { font-size: 24px; color: gray; }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        #tuningStatus {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        select, button {
+            font-size: 18px;
+            margin: 10px;
+            padding: 10px;
+        }
     </style>
 </head>
 <body>
+
     <h1>Chromatic Guitar Tuner</h1>
-    <p id="note">--</p>
-    <p id="frequency">Frequency: -- Hz</p>
+    <p>Select a note to tune:</p>
+    
+    <select id="noteSelect">
+        <option value="C">C</option>
+        <option value="C#">C#</option>
+        <option value="D">D</option>
+        <option value="D#">D#</option>
+        <option value="E">E</option>
+        <option value="F">F</option>
+        <option value="F#">F#</option>
+        <option value="G">G</option>
+        <option value="G#">G#</option>
+        <option value="A" selected>A</option> <!-- Default to A -->
+        <option value="A#">A#</option>
+        <option value="B">B</option>
+    </select>
+
     <button onclick="startTuner()">Start Tuning</button>
+    
+    <p id="frequency">Frequency: -- Hz</p>
+    <p id="tuningStatus">Select a note to tune.</p>
+
     <script>
         async function startTuner() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Your browser does not support microphone access.");
-        return;
-    }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Your browser does not support microphone access.");
+                return;
+            }
 
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const analyser = audioContext.createAnalyser();
-    const microphone = audioContext.createMediaStreamSource(stream);
-    analyser.fftSize = 2048;
-    microphone.connect(analyser);
-    
-    const buffer = new Float32Array(analyser.fftSize);
-
-    function detectPitch() {
-        analyser.getFloatTimeDomainData(buffer);
-        const frequency = getPitch(buffer, audioContext.sampleRate);
-        if (frequency > 50 && frequency < 1000) { // Only show realistic guitar frequencies
-            document.getElementById("frequency").innerText = `Frequency: ${frequency.toFixed(2)} Hz`;
-            document.getElementById("note").innerText = getClosestNote(frequency);
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const analyser = audioContext.createAnalyser();
+            const microphone = audioContext.createMediaStreamSource(stream);
+            analyser.fftSize = 2048;
+            microphone.connect(analyser);
+            
+            const buffer = new Float32Array(analyser.fftSize);
+            function detectPitch() {
+                analyser.getFloatTimeDomainData(buffer);
+                const frequency = getPitch(buffer, audioContext.sampleRate);
+                if (frequency > 50 && frequency < 1000) { // Ignore unrealistic values
+                    document.getElementById("frequency").innerText = `Frequency: ${frequency.toFixed(2)} Hz`;
+                    updateTuningStatus(frequency);
+                }
+                requestAnimationFrame(detectPitch);
+            }
+            detectPitch();
         }
-        requestAnimationFrame(detectPitch);
-    }
-    detectPitch();
-}
 
-function getPitch(buffer, sampleRate) {
-    let size = buffer.length;
-    let rms = 0;
-    for (let i = 0; i < size; i++) {
-        rms += buffer[i] * buffer[i];
-    }
-    rms = Math.sqrt(rms / size);
-    if (rms < 0.01) return -1;
+        // Improved pitch detection function
+        function getPitch(buffer, sampleRate) {
+            let size = buffer.length;
+            let rms = 0;
+            for (let i = 0; i < size; i++) {
+                rms += buffer[i] * buffer[i];
+            }
+            rms = Math.sqrt(rms / size);
+            if (rms < 0.01) return -1;
 
-    let bestOffset = -1, bestCorrelation = 0;
-    for (let offset = 50; offset < size / 2; offset++) {
-        let correlation = 0;
-        for (let i = 0; i < size / 2; i++) {
-            correlation += buffer[i] * buffer[i + offset];
+            let bestOffset = -1, bestCorrelation = 0;
+            for (let offset = 50; offset < size / 2; offset++) {
+                let correlation = 0;
+                for (let i = 0; i < size / 2; i++) {
+                    correlation += buffer[i] * buffer[i + offset];
+                }
+                if (correlation > bestCorrelation) {
+                    bestCorrelation = correlation;
+                    bestOffset = offset;
+                }
+            }
+            return bestOffset > 0 ? sampleRate / bestOffset : -1;
         }
-        if (correlation > bestCorrelation) {
-            bestCorrelation = correlation;
-            bestOffset = offset;
-        }
-    }
-    return bestOffset > 0 ? sampleRate / bestOffset : -1;
-}
 
-function getClosestNote(frequency) {
-    const notes = [
-        { note: "C", freq: 261.63 }, { note: "C#", freq: 277.18 }, { note: "D", freq: 293.66 },
-        { note: "D#", freq: 311.13 }, { note: "E", freq: 329.63 }, { note: "F", freq: 349.23 },
-        { note: "F#", freq: 369.99 }, { note: "G", freq: 392.00 }, { note: "G#", freq: 415.30 },
-        { note: "A", freq: 440.00 }, { note: "A#", freq: 466.16 }, { note: "B", freq: 493.88 }
-    ];
-    return notes.reduce((prev, curr) =>
-        Math.abs(curr.freq - frequency) < Math.abs(prev.freq - frequency) ? curr : prev
-    ).note;
-}
+        // Notes reference
+        const notes = [
+            { note: "C", freq: 261.63 }, { note: "C#", freq: 277.18 }, { note: "D", freq: 293.66 },
+            { note: "D#", freq: 311.13 }, { note: "E", freq: 329.63 }, { note: "F", freq: 349.23 },
+            { note: "F#", freq: 369.99 }, { note: "G", freq: 392.00 }, { note: "G#", freq: 415.30 },
+            { note: "A", freq: 440.00 }, { note: "A#", freq: 466.16 }, { note: "B", freq: 493.88 }
+        ];
+
+        // Update tuning status
+        function updateTuningStatus(frequency) {
+            const targetNoteName = document.getElementById("noteSelect").value;
+            const targetNote = notes.find(n => n.note === targetNoteName);
+
+            if (!targetNote) return;
+
+            const difference = frequency - targetNote.freq;
+            const tolerance = 2; // Acceptable range in Hz
+
+            let statusText = "";
+            let statusColor = "black";
+
+            if (Math.abs(difference) <= tolerance) {
+                statusText = "✅ In Tune!";
+                statusColor = "green";
+            } else if (difference > 0) {
+                statusText = "⬇️ Tune Down";
+                statusColor = "red";
+            } else {
+                statusText = "⬆️ Tune Up";
+                statusColor = "red";
+            }
+
+            document.getElementById("tuningStatus").innerText = statusText;
+            document.getElementById("tuningStatus").style.color = statusColor;
+        }
     </script>
+
 </body>
 </html>
+
