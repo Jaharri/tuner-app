@@ -13,21 +13,11 @@
 <body>
 
     <h1>Chromatic Guitar Tuner</h1>
-    <p>Select a note to tune:</p>
-    
-    <select id="noteSelect">
-        <option value="E2">E (Low) - 82.41 Hz</option>
-        <option value="A2">A - 110.00 Hz</option>
-        <option value="D3">D - 146.83 Hz</option>
-        <option value="G3">G - 196.00 Hz</option>
-        <option value="B3">B - 246.94 Hz</option>
-        <option value="E4">E (High) - 329.63 Hz</option>
-    </select>
-
     <button onclick="startTuner()">Start Tuning</button>
-    
+
     <p id="frequency">Frequency: -- Hz</p>
-    <p id="tuningStatus">Select a note to tune.</p>
+    <p id="note">Note: --</p>
+    <p id="tuningStatus">Waiting for input...</p>
 
     <script>
         let lastFrequencies = [];
@@ -89,13 +79,36 @@
             return lastFrequencies.reduce((a, b) => a + b, 0) / lastFrequencies.length;
         }
 
-        const notes = {
-            "E2": 82.41, "A2": 110.00, "D3": 146.83, "G3": 196.00, "B3": 246.94, "E4": 329.63
-        };
+        const noteFrequencies = [
+            { note: "C", freq: 16.35 }, { note: "C#", freq: 17.32 }, { note: "D", freq: 18.35 }, { note: "D#", freq: 19.45 },
+            { note: "E", freq: 20.60 }, { note: "F", freq: 21.83 }, { note: "F#", freq: 23.12 }, { note: "G", freq: 24.50 },
+            { note: "G#", freq: 25.96 }, { note: "A", freq: 27.50 }, { note: "A#", freq: 29.14 }, { note: "B", freq: 30.87 }
+        ];
+
+        function getClosestNote(frequency) {
+            let minDiff = Infinity;
+            let closestNote = "";
+            let targetFreq = 0;
+
+            for (let i = 0; i < 100; i++) {
+                let octave = Math.floor(i / 12);
+                let baseNote = noteFrequencies[i % 12];
+                let noteFreq = baseNote.freq * Math.pow(2, octave);
+                
+                let diff = Math.abs(frequency - noteFreq);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestNote = baseNote.note + (octave + 1);
+                    targetFreq = noteFreq;
+                }
+            }
+            return { note: closestNote, frequency: targetFreq };
+        }
 
         function updateTuningStatus(frequency) {
-            const selectedNote = document.getElementById("noteSelect").value;
-            const targetFreq = notes[selectedNote];
+            const { note, frequency: targetFreq } = getClosestNote(frequency);
+            document.getElementById("note").innerText = `Note: ${note}`;
+
             const diff = frequency - targetFreq;
             const tolerance = 2;
 
