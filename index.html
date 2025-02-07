@@ -5,20 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chromatic Guitar Tuner</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-        }
-        #tuningStatus {
-            font-size: 24px;
-            font-weight: bold;
-        }
-        select, button {
-            font-size: 18px;
-            margin: 10px;
-            padding: 10px;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        #tuningStatus { font-size: 24px; font-weight: bold; }
+        select, button { font-size: 18px; margin: 10px; padding: 10px; }
     </style>
 </head>
 <body>
@@ -33,36 +22,6 @@
         <option value="G3">G - 196.00 Hz</option>
         <option value="B3">B - 246.94 Hz</option>
         <option value="E4">E (High) - 329.63 Hz</option>
-        <option disabled>──────────</option>
-        <option value="C2">C2 - 65.41 Hz</option>
-        <option value="C#2">C#2 - 69.30 Hz</option>
-        <option value="D2">D2 - 73.42 Hz</option>
-        <option value="D#2">D#2 - 77.78 Hz</option>
-        <option value="E2">E2 - 82.41 Hz</option>
-        <option value="F2">F2 - 87.31 Hz</option>
-        <option value="F#2">F#2 - 92.50 Hz</option>
-        <option value="G2">G2 - 98.00 Hz</option>
-        <option value="G#2">G#2 - 103.83 Hz</option>
-        <option value="A2">A2 - 110.00 Hz</option>
-        <option value="A#2">A#2 - 116.54 Hz</option>
-        <option value="B2">B2 - 123.47 Hz</option>
-        <option value="C3">C3 - 130.81 Hz</option>
-        <option value="C#3">C#3 - 138.59 Hz</option>
-        <option value="D3">D3 - 146.83 Hz</option>
-        <option value="D#3">D#3 - 155.56 Hz</option>
-        <option value="E3">E3 - 164.81 Hz</option>
-        <option value="F3">F3 - 174.61 Hz</option>
-        <option value="F#3">F#3 - 185.00 Hz</option>
-        <option value="G3">G3 - 196.00 Hz</option>
-        <option value="G#3">G#3 - 207.65 Hz</option>
-        <option value="A3">A3 - 220.00 Hz</option>
-        <option value="A#3">A#3 - 233.08 Hz</option>
-        <option value="B3">B3 - 246.94 Hz</option>
-        <option value="C4">C4 - 261.63 Hz</option>
-        <option value="C#4">C#4 - 277.18 Hz</option>
-        <option value="D4">D4 - 293.66 Hz</option>
-        <option value="D#4">D#4 - 311.13 Hz</option>
-        <option value="E4">E4 - 329.63 Hz</option>
     </select>
 
     <button onclick="startTuner()">Start Tuning</button>
@@ -71,6 +30,8 @@
     <p id="tuningStatus">Select a note to tune.</p>
 
     <script>
+        let lastFrequencies = [];
+
         async function startTuner() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert("Your browser does not support microphone access.");
@@ -87,8 +48,10 @@
             const buffer = new Float32Array(analyser.fftSize);
             function detectPitch() {
                 analyser.getFloatTimeDomainData(buffer);
-                const frequency = getPitch(buffer, audioContext.sampleRate);
+                let frequency = getPitch(buffer, audioContext.sampleRate);
+
                 if (frequency > 50 && frequency < 1000) { 
+                    frequency = smoothFrequency(frequency);
                     document.getElementById("frequency").innerText = `Frequency: ${frequency.toFixed(2)} Hz`;
                     updateTuningStatus(frequency);
                 }
@@ -120,10 +83,14 @@
             return bestOffset > 0 ? sampleRate / bestOffset : -1;
         }
 
+        function smoothFrequency(freq) {
+            lastFrequencies.push(freq);
+            if (lastFrequencies.length > 5) lastFrequencies.shift();
+            return lastFrequencies.reduce((a, b) => a + b, 0) / lastFrequencies.length;
+        }
+
         const notes = {
-            "E2": 82.41, "A2": 110.00, "D3": 146.83, "G3": 196.00, "B3": 246.94, "E4": 329.63,
-            "C2": 65.41, "C#2": 69.30, "D2": 73.42, "D#2": 77.78, "F2": 87.31, "F#2": 92.50,
-            "G2": 98.00, "G#2": 103.83, "A#2": 116.54, "B2": 123.47, "C3": 130.81, "C#3": 138.59
+            "E2": 82.41, "A2": 110.00, "D3": 146.83, "G3": 196.00, "B3": 246.94, "E4": 329.63
         };
 
         function updateTuningStatus(frequency) {
