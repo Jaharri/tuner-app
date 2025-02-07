@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromatic Guitar Tuner</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        #note { font-size: 48px; font-weight: bold; }
+        #frequency { font-size: 24px; color: gray; }
+    </style>
+</head>
+<body>
+    <h1>Chromatic Guitar Tuner</h1>
+    <p id="note">--</p>
+    <p id="frequency">Frequency: -- Hz</p>
+    <button onclick="startTuner()">Start Tuning</button>
+    <script>
+        async function startTuner() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Your browser does not support microphone access.");
+                return;
+            }
+
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const analyser = audioContext.createAnalyser();
+            const microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+            analyser.fftSize = 2048;
+            const buffer = new Float32Array(analyser.fftSize);
+
+            function detectPitch() {
+                analyser.getFloatTimeDomainData(buffer);
+                const frequency = autoCorrelate(buffer, audioContext.sampleRate);
+                if (frequency > 0) {
+                    document.getElementById("frequency").innerText = `Frequency: ${frequency.toFixed(2)} Hz`;
+                    document.getElementById("note").innerText = getClosestNote(frequency);
+                }
+                requestAnimationFrame(detectPitch);
+            }
+            detectPitch();
+        }
+
+        function autoCorrelate(buffer, sampleRate) {
+            let size = buffer.length;
+            let bestOffset = -1;
+            let bestCorrelation = 0;
+            let rms = 0;
+            
+            for (let i = 0; i < size; i++) {
+                rms += buffer[i] * buffer[i];
+            }
+            rms = Math.sqrt(rms / size);
+            if (rms < 0.01) return -1;
+            
+            let correlations = new Array(size).fill(0);
+            for (let offset = 1; offset < size; offset++) {
+                let correlation = 0;
+                for (let i = 0; i < size - offset; i++) {
+                    correlation += buffer[i] * buffer[i + offset];
+                }
+                correlations[offset] = correlation;
+                if (correlation > bestCorrelation) {
+                    bestCorrelation = correlation;
+                    bestOffset = offset;
+                }
+            }
+            return bestOffset > 0 ? sampleRate / bestOffset : -1;
+        }
+
+        function getClosestNote(frequency) {
+            const notes = [
+                { note: "C", freq: 261.63 },
+                { note: "C#", freq: 277.18 },
+                { note: "D", freq: 293.66 },
+                { note: "D#", freq: 311.13 },
+                { note: "E", freq: 329.63 },
+                { note: "F", freq: 349.23 },
+                { note: "F#", freq: 369.99 },
+                { note: "G", freq: 392.00 },
+                { note: "G#", freq: 415.30 },
+                { note: "A", freq: 440.00 },
+                { note: "A#", freq: 466.16 },
+                { note: "B", freq: 493.88 }
+            ];
+            return notes.reduce((prev, curr) => 
+                Math.abs(curr.freq - frequency) < Math.abs(prev.freq - frequency) ? curr : prev
+            ).note;
+        }
+    </script>
+</body>
+</html>
