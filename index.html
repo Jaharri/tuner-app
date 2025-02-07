@@ -21,6 +21,7 @@
 
     <script>
         let lastFrequencies = [];
+        const SMOOTHING_COUNT = 10; 
 
         async function startTuner() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -75,8 +76,17 @@
 
         function smoothFrequency(freq) {
             lastFrequencies.push(freq);
-            if (lastFrequencies.length > 5) lastFrequencies.shift();
-            return lastFrequencies.reduce((a, b) => a + b, 0) / lastFrequencies.length;
+            if (lastFrequencies.length > SMOOTHING_COUNT) lastFrequencies.shift();
+
+            let weightedAvg = 0;
+            let weightSum = 0;
+
+            for (let i = 0; i < lastFrequencies.length; i++) {
+                let weight = i + 1;
+                weightedAvg += lastFrequencies[i] * weight;
+                weightSum += weight;
+            }
+            return weightedAvg / weightSum;
         }
 
         const noteFrequencies = [
