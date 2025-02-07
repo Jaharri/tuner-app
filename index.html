@@ -21,7 +21,8 @@
 
     <script>
         let lastFrequencies = [];
-        const SMOOTHING_COUNT = 10; 
+        const SMOOTHING_COUNT = 5; // Lower count for more stability
+        const STABLE_THRESHOLD = 5; // How many consecutive readings must be close
 
         async function startTuner() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -33,7 +34,7 @@
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const analyser = audioContext.createAnalyser();
             const microphone = audioContext.createMediaStreamSource(stream);
-            analyser.fftSize = 2048;
+            analyser.fftSize = 4096; // Higher for better low-end detection
             microphone.connect(analyser);
             
             const buffer = new Float32Array(analyser.fftSize);
@@ -78,15 +79,10 @@
             lastFrequencies.push(freq);
             if (lastFrequencies.length > SMOOTHING_COUNT) lastFrequencies.shift();
 
-            let weightedAvg = 0;
-            let weightSum = 0;
+            let median = lastFrequencies.slice().sort((a, b) => a - b)[Math.floor(lastFrequencies.length / 2)];
+            let stableCount = lastFrequencies.filter(f => Math.abs(f - median) < 3).length;
 
-            for (let i = 0; i < lastFrequencies.length; i++) {
-                let weight = i + 1;
-                weightedAvg += lastFrequencies[i] * weight;
-                weightSum += weight;
-            }
-            return weightedAvg / weightSum;
+            return stableCount >= STABLE_THRESHOLD ? median : freq;
         }
 
         const noteFrequencies = [
