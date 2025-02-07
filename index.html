@@ -27,18 +27,42 @@
     <p>Select a note to tune:</p>
     
     <select id="noteSelect">
-        <option value="C">C</option>
-        <option value="C#">C#</option>
-        <option value="D">D</option>
-        <option value="D#">D#</option>
-        <option value="E">E</option>
-        <option value="F">F</option>
-        <option value="F#">F#</option>
-        <option value="G">G</option>
-        <option value="G#">G#</option>
-        <option value="A" selected>A</option> <!-- Default to A -->
-        <option value="A#">A#</option>
-        <option value="B">B</option>
+        <option value="E2">E (Low) - 82.41 Hz</option>
+        <option value="A2">A - 110.00 Hz</option>
+        <option value="D3">D - 146.83 Hz</option>
+        <option value="G3">G - 196.00 Hz</option>
+        <option value="B3">B - 246.94 Hz</option>
+        <option value="E4">E (High) - 329.63 Hz</option>
+        <option disabled>──────────</option>
+        <option value="C2">C2 - 65.41 Hz</option>
+        <option value="C#2">C#2 - 69.30 Hz</option>
+        <option value="D2">D2 - 73.42 Hz</option>
+        <option value="D#2">D#2 - 77.78 Hz</option>
+        <option value="E2">E2 - 82.41 Hz</option>
+        <option value="F2">F2 - 87.31 Hz</option>
+        <option value="F#2">F#2 - 92.50 Hz</option>
+        <option value="G2">G2 - 98.00 Hz</option>
+        <option value="G#2">G#2 - 103.83 Hz</option>
+        <option value="A2">A2 - 110.00 Hz</option>
+        <option value="A#2">A#2 - 116.54 Hz</option>
+        <option value="B2">B2 - 123.47 Hz</option>
+        <option value="C3">C3 - 130.81 Hz</option>
+        <option value="C#3">C#3 - 138.59 Hz</option>
+        <option value="D3">D3 - 146.83 Hz</option>
+        <option value="D#3">D#3 - 155.56 Hz</option>
+        <option value="E3">E3 - 164.81 Hz</option>
+        <option value="F3">F3 - 174.61 Hz</option>
+        <option value="F#3">F#3 - 185.00 Hz</option>
+        <option value="G3">G3 - 196.00 Hz</option>
+        <option value="G#3">G#3 - 207.65 Hz</option>
+        <option value="A3">A3 - 220.00 Hz</option>
+        <option value="A#3">A#3 - 233.08 Hz</option>
+        <option value="B3">B3 - 246.94 Hz</option>
+        <option value="C4">C4 - 261.63 Hz</option>
+        <option value="C#4">C#4 - 277.18 Hz</option>
+        <option value="D4">D4 - 293.66 Hz</option>
+        <option value="D#4">D#4 - 311.13 Hz</option>
+        <option value="E4">E4 - 329.63 Hz</option>
     </select>
 
     <button onclick="startTuner()">Start Tuning</button>
@@ -64,7 +88,7 @@
             function detectPitch() {
                 analyser.getFloatTimeDomainData(buffer);
                 const frequency = getPitch(buffer, audioContext.sampleRate);
-                if (frequency > 50 && frequency < 1000) { // Ignore unrealistic values
+                if (frequency > 50 && frequency < 1000) { 
                     document.getElementById("frequency").innerText = `Frequency: ${frequency.toFixed(2)} Hz`;
                     updateTuningStatus(frequency);
                 }
@@ -73,7 +97,6 @@
             detectPitch();
         }
 
-        // Improved pitch detection function
         function getPitch(buffer, sampleRate) {
             let size = buffer.length;
             let rms = 0;
@@ -97,31 +120,25 @@
             return bestOffset > 0 ? sampleRate / bestOffset : -1;
         }
 
-        // Notes reference
-        const notes = [
-            { note: "C", freq: 261.63 }, { note: "C#", freq: 277.18 }, { note: "D", freq: 293.66 },
-            { note: "D#", freq: 311.13 }, { note: "E", freq: 329.63 }, { note: "F", freq: 349.23 },
-            { note: "F#", freq: 369.99 }, { note: "G", freq: 392.00 }, { note: "G#", freq: 415.30 },
-            { note: "A", freq: 440.00 }, { note: "A#", freq: 466.16 }, { note: "B", freq: 493.88 }
-        ];
+        const notes = {
+            "E2": 82.41, "A2": 110.00, "D3": 146.83, "G3": 196.00, "B3": 246.94, "E4": 329.63,
+            "C2": 65.41, "C#2": 69.30, "D2": 73.42, "D#2": 77.78, "F2": 87.31, "F#2": 92.50,
+            "G2": 98.00, "G#2": 103.83, "A#2": 116.54, "B2": 123.47, "C3": 130.81, "C#3": 138.59
+        };
 
-        // Update tuning status
         function updateTuningStatus(frequency) {
-            const targetNoteName = document.getElementById("noteSelect").value;
-            const targetNote = notes.find(n => n.note === targetNoteName);
-
-            if (!targetNote) return;
-
-            const difference = frequency - targetNote.freq;
-            const tolerance = 2; // Acceptable range in Hz
+            const selectedNote = document.getElementById("noteSelect").value;
+            const targetFreq = notes[selectedNote];
+            const diff = frequency - targetFreq;
+            const tolerance = 2;
 
             let statusText = "";
             let statusColor = "black";
 
-            if (Math.abs(difference) <= tolerance) {
+            if (Math.abs(diff) <= tolerance) {
                 statusText = "✅ In Tune!";
                 statusColor = "green";
-            } else if (difference > 0) {
+            } else if (diff > 0) {
                 statusText = "⬇️ Tune Down";
                 statusColor = "red";
             } else {
@@ -136,4 +153,3 @@
 
 </body>
 </html>
-
