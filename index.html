@@ -57,6 +57,7 @@
         const baseFrequencies = {"C": 130.81, "C#": 138.59, "D": 146.83, "D#": 155.56, "E": 164.81, "F": 174.61, "F#": 185.00, "G": 196.00, "G#": 207.65, "A": 220.00, "A#": 233.08, "B": 246.94};
         let audioContext = new (window.AudioContext || window.webkitAudioContext)();
         let currentOscillator = null;
+        let currentNote = null;
         let currentOctave = 0;
 
         function createButtons() {
@@ -72,14 +73,12 @@
 
         function toggleTone(note) {
             const frequency = baseFrequencies[note] * Math.pow(2, currentOctave);
-            if (currentOscillator) {
-                currentOscillator.stop();
-                currentOscillator.disconnect();
-                if (currentOscillator.frequency.value === frequency) {
-                    currentOscillator = null;
-                    return;
-                }
+            if (currentOscillator && currentNote === note) {
+                stopTone();
+                return;
             }
+            stopTone();
+            currentNote = note;
             currentOscillator = audioContext.createOscillator();
             currentOscillator.type = "sine";
             currentOscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
@@ -87,13 +86,20 @@
             currentOscillator.start();
         }
 
+        function stopTone() {
+            if (currentOscillator) {
+                currentOscillator.stop();
+                currentOscillator.disconnect();
+                currentOscillator = null;
+                currentNote = null;
+            }
+        }
+
         function toggleOctave() {
             currentOctave = currentOctave === 0 ? 1 : 0;
             document.getElementById("octave-display").textContent = currentOctave;
-            if (currentOscillator) {
-                const currentFrequency = currentOscillator.frequency.value;
-                let note = Object.keys(baseFrequencies).find(n => baseFrequencies[n] * Math.pow(2, currentOctave) === currentFrequency * (currentOctave === 1 ? 2 : 0.5));
-                if (note) toggleTone(note);
+            if (currentOscillator && currentNote) {
+                currentOscillator.frequency.setValueAtTime(baseFrequencies[currentNote] * Math.pow(2, currentOctave), audioContext.currentTime);
             }
         }
 
