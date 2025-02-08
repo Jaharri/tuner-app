@@ -5,107 +5,125 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chromatic Guitar Tuner</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-        .note-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 20px; }
-        button { font-size: 18px; padding: 10px; cursor: pointer; }
-        #tuningMeter { width: 100%; height: 20px; background: lightgray; position: relative; margin-top: 20px; }
-        #indicator { width: 10px; height: 20px; background: red; position: absolute; left: 50%; transform: translateX(-50%); }
+        body { text-align: center; font-family: Arial, sans-serif; }
+        #slider-container { position: relative; width: 300px; margin: 20px auto; }
+        #tune-slider { width: 100%; }
+        #indicator { position: absolute; width: 10px; height: 20px; background: red; top: 5px; left: 50%; transform: translateX(-50%); }
     </style>
 </head>
 <body>
-
     <h1>Chromatic Guitar Tuner</h1>
-    <div class="note-buttons">
-        <button onclick="setTargetNote('C')">C</button>
-        <button onclick="setTargetNote('C#')">C#</button>
-        <button onclick="setTargetNote('D')">D</button>
-        <button onclick="setTargetNote('D#')">D#</button>
-        <button onclick="setTargetNote('E')">E</button>
-        <button onclick="setTargetNote('F')">F</button>
-        <button onclick="setTargetNote('F#')">F#</button>
-        <button onclick="setTargetNote('G')">G</button>
-        <button onclick="setTargetNote('G#')">G#</button>
-        <button onclick="setTargetNote('A')">A</button>
-        <button onclick="setTargetNote('A#')">A#</button>
-        <button onclick="setTargetNote('B')">B</button>
+    <p>Select a note to tune to:</p>
+    <select id="note-selector">
+        <option value="82.41">E2 (Low E)</option>
+        <option value="110.00">A2</option>
+        <option value="146.83">D3</option>
+        <option value="196.00">G3</option>
+        <option value="246.94">B3</option>
+        <option value="329.63">E4 (High E)</option>
+        <option value="Any">Chromatic</option>
+    </select>
+
+    <div id="slider-container">
+        <input type="range" id="tune-slider" min="-50" max="50" value="0" disabled>
+        <div id="indicator"></div>
     </div>
-
-    <button onclick="startTuner()">Start Tuning</button>
-
-    <p id="selectedNote">Selected Note: --</p>
-    <p id="frequency">Frequency: -- Hz</p>
-    <div id="tuningMeter"><div id="indicator"></div></div>
+    <p id="status">Waiting for input...</p>
 
     <script>
-        let targetNote = null;
-        const noteFrequencies = {
-            "C": 130.81, "C#": 138.59, "D": 146.83, "D#": 155.56, "E": 164.81, "F": 174.61,
-            "F#": 185.00, "G": 196.00, "G#": 207.65, "A": 220.00, "A#": 233.08, "B": 246.94
-        };
+        let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let analyser = audioContext.createAnalyser();
+        let dataArray = new Float32Array(analyser.fftSize);
+        let selectedFrequency = 82.41; // Default to low E
 
-        function setTargetNote(note) {
-            targetNote = note;
-            document.getElementById("selectedNote").innerText = `Selected Note: ${note}`;
-        }
+        document.getElementById('note-selector').addEventListener('change', function () {
+            let value = this.value;
+            selectedFrequency = value === "Any" ? null : parseFloat(value);
+        });
 
         async function startTuner() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("Your browser does not support microphone access.");
-                return;
-            }
+            let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            let source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
 
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const analyser = audioContext.createAnalyser();
-            const microphone = audioContext.createMediaStreamSource(stream);
-            analyser.fftSize = 4096;
-            microphone.connect(analyser);
-            
-            const buffer = new Float32Array(analyser.fftSize);
             function detectPitch() {
-                analyser.getFloatTimeDomainData(buffer);
-                let frequency = getPitch(buffer, audioContext.sampleRate);
-
-                if (frequency > 50 && frequency < 1000) { 
-                    document.getElementById("frequency").innerText = `Frequency: ${frequency.toFixed(2)} Hz`;
-                    if (targetNote) updateTuningDisplay(frequency);
+                analyser.getFloatTimeDomainData(dataArray);
+                let frequency = autoCorrelate(dataArray, audioContext.sampleRate);
+                if (frequency > 0) {
+                    updateUI(frequency);
                 }
                 requestAnimationFrame(detectPitch);
             }
             detectPitch();
         }
 
-        function getPitch(buffer, sampleRate) {
-            let size = buffer.length;
-            let bestOffset = -1, bestCorrelation = 0;
-            for (let offset = 50; offset < size / 2; offset++) {
+        function updateUI(frequency) {
+            let status = document.getElementById('status');
+            let slider = document.getElementById('tune-slider');
+            let indicator = document.getElementById('indicator');
+
+            let targetFrequency = selectedFrequency;
+            if (!targetFrequency) {
+                targetFrequency = findClosestNoteFrequency(frequency);
+            }
+
+            let diff = frequency - targetFrequency;
+            let offset = Math.max(-50, Math.min(50, (diff / targetFrequency) * 200)); // Normalize range
+
+            slider.value = offset;
+            indicator.style.left = `${50 + offset}%`;
+
+            if (Math.abs(diff) < 2) {
+                status.textContent = `In tune: ${frequency.toFixed(2)} Hz`;
+                status.style.color = "green";
+            } else if (diff > 0) {
+                status.textContent = `Too sharp (${frequency.toFixed(2)} Hz)`;
+                status.style.color = "red";
+            } else {
+                status.textContent = `Too flat (${frequency.toFixed(2)} Hz)`;
+                status.style.color = "blue";
+            }
+        }
+
+        function autoCorrelate(buffer, sampleRate) {
+            let SIZE = buffer.length;
+            let bestOffset = -1, bestCorrelation = 0, rms = 0;
+
+            for (let i = 0; i < SIZE; i++) {
+                let val = buffer[i];
+                rms += val * val;
+            }
+            rms = Math.sqrt(rms / SIZE);
+            if (rms < 0.01) return -1;
+
+            let lastCorrelation = 1;
+            for (let offset = 1; offset < SIZE / 2; offset++) {
                 let correlation = 0;
-                for (let i = 0; i < size / 2; i++) {
+                for (let i = 0; i < SIZE / 2; i++) {
                     correlation += buffer[i] * buffer[i + offset];
                 }
-                if (correlation > bestCorrelation) {
+                correlation = correlation / (rms * SIZE);
+                if (correlation > 0.9 && correlation > lastCorrelation) {
                     bestCorrelation = correlation;
                     bestOffset = offset;
                 }
+                lastCorrelation = correlation;
             }
-            return bestOffset > 0 ? sampleRate / bestOffset : -1;
+
+            if (bestCorrelation > 0.9) {
+                return sampleRate / bestOffset;
+            }
+            return -1;
         }
 
-        function updateTuningDisplay(frequency) {
-            if (!targetNote) return;
-
-            let baseFreq = noteFrequencies[targetNote];
-            while (baseFreq * 2 <= 700) baseFreq *= 2; // Match closest octave for guitar tuning
-
-            let diff = frequency - baseFreq;
-            let percent = Math.min(50, Math.max(-50, (diff / baseFreq) * 100));
-
-            let indicator = document.getElementById("indicator");
-            indicator.style.left = `${50 + percent}%`;
-
-            indicator.style.background = Math.abs(diff) < 2 ? "green" : "red";
+        function findClosestNoteFrequency(frequency) {
+            let notes = [82.41, 87.31, 92.50, 98.00, 103.83, 110.00, 116.54, 123.47, 130.81, 138.59, 146.83, 155.56,
+                         164.81, 174.61, 185.00, 196.00, 207.65, 220.00, 233.08, 246.94, 261.63, 277.18, 293.66, 311.13,
+                         329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88];
+            return notes.reduce((prev, curr) => Math.abs(curr - frequency) < Math.abs(prev - frequency) ? curr : prev);
         }
+
+        startTuner();
     </script>
-
 </body>
 </html>
