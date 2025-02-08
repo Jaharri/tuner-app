@@ -133,14 +133,12 @@
                 osc.type = "sine";
                 osc.frequency.setValueAtTime(beat === 0 && document.getElementById("accent").checked ? 200 : 150, audioContext.currentTime);
                 gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+                gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+                gainNode.gain.linearRampToValueAtTime(0.001, audioContext.currentTime + (beatDuration / 1000) - 0.01);
                 osc.connect(gainNode);
                 gainNode.connect(audioContext.destination);
                 osc.start();
-                setTimeout(() => {
-                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.05);
-                    setTimeout(() => osc.stop(), 50);
-                }, 100);
+                osc.stop(audioContext.currentTime + (beatDuration / 1000));
                 beat = (beat + 1) % timeSignature;
             }, beatDuration);
         }
