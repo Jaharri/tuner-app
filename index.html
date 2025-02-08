@@ -5,97 +5,120 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guitar Tuner</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #111; color: white; margin: 0; padding: 20px; }
-        h1 { font-size: 1.5em; margin-bottom: 10px; }
-        #note-display { font-size: 2em; font-weight: bold; margin: 10px 0; color: #ffcc00; }
-        #frequency-display { font-size: 1.2em; margin-bottom: 20px; }
-        #tune-meter { width: 80%; height: 20px; background: #444; border-radius: 10px; position: relative; margin: auto; }
-        #needle { width: 10px; height: 20px; background: red; position: absolute; left: 50%; transition: left 0.1s linear; }
-        button { background: #ffcc00; color: #111; border: none; padding: 10px 15px; margin: 5px; font-size: 1em; border-radius: 5px; cursor: pointer; }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            color: white;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 1.2em;
+            color: #ffcc00;
+        }
+        #note {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        #tuning-indicator {
+            width: 80%;
+            height: 20px;
+            background: #444;
+            margin: 20px auto;
+            position: relative;
+            border-radius: 10px;
+        }
+        #indicator {
+            width: 10px;
+            height: 20px;
+            background: red;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: left 0.1s linear;
+        }
+        button {
+            padding: 10px;
+            font-size: 1.2em;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
     <h1>Guitar Tuner</h1>
-    <button id="start-button">Start Tuner</button>
-    <p id="note-display">-</p>
-    <p id="frequency-display">Waiting for sound...</p>
-    <div id="tune-meter"><div id="needle"></div></div>
-
+    <p id="status">Click start to begin tuning.</p>
+    <p id="note">-</p>
+    <div id="tuning-indicator">
+        <div id="indicator"></div>
+    </div>
+    <button onclick="startTuner()">Start Tuning</button>
     <script>
         let audioContext, analyser, microphone, dataArray;
-        let isTuning = false;
-
-        document.getElementById("start-button").addEventListener("click", async () => {
-            if (!isTuning) {
-                await startTuner();
-                isTuning = true;
-                document.getElementById("start-button").style.display = "none";
-            }
-        });
-
+        const noteElement = document.getElementById("note");
+        const statusElement = document.getElementById("status");
+        const indicator = document.getElementById("indicator");
+        
         async function startTuner() {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                await audioContext.resume();  // Fix for iOS AudioContext suspension
-                let stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
-                microphone = audioContext.createMediaStreamSource(stream);
                 analyser = audioContext.createAnalyser();
                 analyser.fftSize = 2048;
-                dataArray = new Float32Array(analyser.fftSize);
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                microphone = audioContext.createMediaStreamSource(stream);
                 microphone.connect(analyser);
+                dataArray = new Uint8Array(analyser.fftSize);
                 detectPitch();
-            } catch (error) {
-                console.error("Microphone access error:", error);
-                alert("Microphone access error. Check permissions.");
+                statusElement.textContent = "Listening...";
+            } catch (err) {
+                statusElement.textContent = "Microphone access denied.";
+                console.error(err);
             }
         }
-
+        
         function detectPitch() {
-            analyser.getFloatTimeDomainData(dataArray);
-            let frequency = autoCorrelate(dataArray, audioContext.sampleRate);
-            if (frequency > 0) updateUI(frequency);
-            else document.getElementById("frequency-display").textContent = "No sound detected...";
+            analyser.getByteTimeDomainData(dataArray);
+            let frequency = getPitchFromBuffer(dataArray);
+            if (frequency) {
+                let closestNote = getClosestNote(frequency);
+                noteElement.textContent = closestNote.note;
+                let offset = ((frequency - closestNote.freq) / 10) * 50;
+                indicator.style.left = `${50 + offset}%`;
+                statusElement.textContent = "";
+            } else {
+                statusElement.textContent = "No sound detected...";
+            }
             requestAnimationFrame(detectPitch);
         }
-
-        function updateUI(frequency) {
-            document.getElementById("frequency-display").textContent = `${frequency.toFixed(2)} Hz`;
-            let note = getClosestNote(frequency);
-            document.getElementById("note-display").textContent = note.name;
-            let offset = ((frequency - note.frequency) / note.frequency) * 100;
-            document.getElementById("needle").style.left = `${50 + offset}%`;
-        }
-
-        function getClosestNote(frequency) {
-            const notes = [
-                { name: "E2", freq: 82.41 }, { name: "F2", freq: 87.31 }, { name: "F#2", freq: 92.50 },
-                { name: "G2", freq: 98.00 }, { name: "G#2", freq: 103.83 }, { name: "A2", freq: 110.00 },
-                { name: "A#2", freq: 116.54 }, { name: "B2", freq: 123.47 }, { name: "C3", freq: 130.81 },
-                { name: "C#3", freq: 138.59 }, { name: "D3", freq: 146.83 }, { name: "D#3", freq: 155.56 },
-                { name: "E3", freq: 164.81 }, { name: "F3", freq: 174.61 }, { name: "F#3", freq: 185.00 },
-                { name: "G3", freq: 196.00 }, { name: "G#3", freq: 207.65 }, { name: "A3", freq: 220.00 },
-                { name: "A#3", freq: 233.08 }, { name: "B3", freq: 246.94 }, { name: "C4", freq: 261.63 },
-                { name: "C#4", freq: 277.18 }, { name: "D4", freq: 293.66 }, { name: "D#4", freq: 311.13 },
-                { name: "E4", freq: 329.63 }
-            ];
-            return notes.reduce((prev, curr) => Math.abs(curr.freq - frequency) < Math.abs(prev.freq - frequency) ? curr : prev);
-        }
-
-        function autoCorrelate(buffer, sampleRate) {
-            let SIZE = buffer.length;
-            let rms = Math.sqrt(buffer.reduce((sum, val) => sum + val * val, 0) / SIZE);
-            if (rms < 0.01) return -1; // No sound detected
-
-            let bestOffset = -1, bestCorrelation = 0;
-            for (let offset = 1; offset < SIZE / 2; offset++) {
-                let correlation = buffer.slice(0, SIZE / 2).reduce((sum, val, i) => sum + val * buffer[i + offset], 0);
-                if (correlation > bestCorrelation) {
-                    bestCorrelation = correlation;
-                    bestOffset = offset;
+        
+        function getPitchFromBuffer(buffer) {
+            let maxVal = 0;
+            let maxIndex = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                if (buffer[i] > maxVal) {
+                    maxVal = buffer[i];
+                    maxIndex = i;
                 }
             }
-
-            return bestCorrelation > 0.9 ? sampleRate / bestOffset : -1;
+            let sampleRate = audioContext.sampleRate;
+            return sampleRate / maxIndex;
+        }
+        
+        function getClosestNote(freq) {
+            const notes = [
+                { note: "E2", freq: 82.41 }, { note: "A2", freq: 110.00 },
+                { note: "D3", freq: 146.83 }, { note: "G3", freq: 196.00 },
+                { note: "B3", freq: 246.94 }, { note: "E4", freq: 329.63 }
+            ];
+            return notes.reduce((prev, curr) => 
+                Math.abs(curr.freq - freq) < Math.abs(prev.freq - freq) ? curr : prev
+            );
         }
     </script>
 </body>
