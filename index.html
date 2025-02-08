@@ -37,21 +37,21 @@
     <h1>Guitar Tuner</h1>
     <label for="octave">Octave: </label>
     <span id="octave-display">0</span>
-    <button onclick="changeOctave(1)">+</button>
+    <button onclick="toggleOctave()">Toggle Octave</button>
     <div id="buttons"></div>
     <h2>Metronome</h2>
     <label for="bpm">BPM: </label>
     <input type="number" id="bpm" value="120" min="30" max="300">
     <label for="time-signature">Time Signature: </label>
-    <select id="time-signature">
+    <select id="time-signature" onchange="updateMetronome()">
         <option value="4">4/4</option>
         <option value="3">3/4</option>
         <option value="6">6/8</option>
     </select>
     <label>
-        <input type="checkbox" id="accent" checked> Accent first beat
+        <input type="checkbox" id="accent" checked onchange="updateMetronome()"> Accent first beat
     </label>
-    <button onclick="toggleMetronome()">Toggle Metronome</button>
+    <button id="metronome-toggle" onclick="toggleMetronome()">Start</button>
     <script>
         const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         const baseFrequencies = {"C": 130.81, "C#": 138.59, "D": 146.83, "D#": 155.56, "E": 164.81, "F": 174.61, "F#": 185.00, "G": 196.00, "G#": 207.65, "A": 220.00, "A#": 233.08, "B": 246.94};
@@ -84,8 +84,8 @@
             currentOscillator.start();
         }
 
-        function changeOctave(direction) {
-            currentOctave = Math.min(1, currentOctave + direction);
+        function toggleOctave() {
+            currentOctave = currentOctave === 0 ? 1 : 0;
             document.getElementById("octave-display").textContent = currentOctave;
         }
 
@@ -95,25 +95,36 @@
             if (metronomePlaying) {
                 clearInterval(metronomeInterval);
                 metronomePlaying = false;
+                document.getElementById("metronome-toggle").textContent = "Start";
                 return;
             }
+            document.getElementById("metronome-toggle").textContent = "Stop";
+            startMetronome();
+        }
+
+        function startMetronome() {
             const bpm = parseInt(document.getElementById("bpm").value);
             const beatDuration = 60000 / bpm;
             const timeSignature = parseInt(document.getElementById("time-signature").value);
-            let accent = document.getElementById("accent").checked;
             let beat = 0;
+            metronomePlaying = true;
 
             metronomeInterval = setInterval(() => {
-                accent = document.getElementById("accent").checked;
                 let osc = audioContext.createOscillator();
                 osc.type = "sine";
-                osc.frequency.setValueAtTime(beat === 0 && accent ? 300 : 250, audioContext.currentTime);
+                osc.frequency.setValueAtTime(beat === 0 && document.getElementById("accent").checked ? 250 : 200, audioContext.currentTime);
                 osc.connect(audioContext.destination);
                 osc.start();
                 setTimeout(() => osc.stop(), 100);
                 beat = (beat + 1) % timeSignature;
             }, beatDuration);
-            metronomePlaying = true;
+        }
+
+        function updateMetronome() {
+            if (metronomePlaying) {
+                clearInterval(metronomeInterval);
+                startMetronome();
+            }
         }
 
         createButtons();
