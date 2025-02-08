@@ -9,122 +9,61 @@
             font-family: Arial, sans-serif;
             text-align: center;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             background-color: #222;
             color: white;
         }
         h1 {
-            margin-top: 20px;
-        }
-        #status {
-            margin-top: 10px;
-            font-size: 1.2em;
-            color: #ffcc00;
-        }
-        #note {
-            font-size: 3em;
-            font-weight: bold;
-            margin: 20px 0;
-        }
-        #tuning-indicator {
-            width: 80%;
-            height: 20px;
-            background: #444;
-            margin: 20px auto;
-            position: relative;
-            border-radius: 10px;
-        }
-        #indicator {
-            width: 10px;
-            height: 20px;
-            background: red;
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            transition: left 0.1s linear;
+            margin-bottom: 20px;
         }
         button {
-            padding: 10px;
+            display: block;
+            width: 80%;
+            margin: 10px auto;
+            padding: 15px;
             font-size: 1.2em;
-            margin-top: 20px;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #666;
         }
     </style>
 </head>
 <body>
     <h1>Guitar Tuner</h1>
-    <p id="status">Click start to begin tuning.</p>
-    <p id="note">-</p>
-    <div id="tuning-indicator">
-        <div id="indicator"></div>
-    </div>
-    <button onclick="startTuner()">Start Tuning</button>
+    <div id="buttons"></div>
     <script>
-        let audioContext, analyser, microphone, bufferLength, dataArray;
-        const noteElement = document.getElementById("note");
-        const statusElement = document.getElementById("status");
-        const indicator = document.getElementById("indicator");
-        let smoothingFactor = 0.8;
-        let lastFrequency = 0;
-
-        async function startTuner() {
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 2048;
-                bufferLength = analyser.frequencyBinCount;
-                dataArray = new Float32Array(bufferLength);
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                microphone = audioContext.createMediaStreamSource(stream);
-                microphone.connect(analyser);
-                detectPitch();
-                statusElement.textContent = "Listening...";
-            } catch (err) {
-                statusElement.textContent = "Microphone access denied.";
-                console.error(err);
-            }
+        const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const baseFrequencies = {"C": 130.81, "C#": 138.59, "D": 146.83, "D#": 155.56, "E": 164.81, "F": 174.61, "F#": 185.00, "G": 196.00, "G#": 207.65, "A": 220.00, "A#": 233.08, "B": 246.94};
+        
+        function createButtons() {
+            const container = document.getElementById("buttons");
+            notes.forEach(note => {
+                const button = document.createElement("button");
+                button.textContent = note;
+                button.onclick = () => playTone(baseFrequencies[note]);
+                container.appendChild(button);
+            });
         }
 
-        function detectPitch() {
-            analyser.getFloatFrequencyData(dataArray);
-            let maxIndex = dataArray.indexOf(Math.max(...dataArray));
-            let frequency = maxIndex * (audioContext.sampleRate / analyser.fftSize);
-            
-            if (lastFrequency) {
-                frequency = lastFrequency * smoothingFactor + frequency * (1 - smoothingFactor);
-            }
-            lastFrequency = frequency;
-            
-            if (frequency > 20 && frequency < 5000) {
-                let closestNote = getClosestNote(frequency);
-                noteElement.textContent = closestNote.note;
-                let offset = Math.max(-50, Math.min(50, ((frequency - closestNote.freq) / closestNote.freq) * 50));
-                indicator.style.left = `${50 + offset}%`;
-                statusElement.textContent = "";
-            } else {
-                statusElement.textContent = "No sound detected...";
-            }
-            requestAnimationFrame(detectPitch);
+        function playTone(frequency) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            oscillator.connect(audioContext.destination);
+            oscillator.start();
+            setTimeout(() => {
+                oscillator.stop();
+                audioContext.close();
+            }, 3000);
         }
 
-        function getClosestNote(freq) {
-            const notes = [
-                { note: "E2", freq: 82.41 }, { note: "F2", freq: 87.31 }, { note: "F#2", freq: 92.50 },
-                { note: "G2", freq: 98.00 }, { note: "G#2", freq: 103.83 }, { note: "A2", freq: 110.00 },
-                { note: "A#2", freq: 116.54 }, { note: "B2", freq: 123.47 }, { note: "C3", freq: 130.81 },
-                { note: "C#3", freq: 138.59 }, { note: "D3", freq: 146.83 }, { note: "D#3", freq: 155.56 },
-                { note: "E3", freq: 164.81 }, { note: "F3", freq: 174.61 }, { note: "F#3", freq: 185.00 },
-                { note: "G3", freq: 196.00 }, { note: "G#3", freq: 207.65 }, { note: "A3", freq: 220.00 },
-                { note: "A#3", freq: 233.08 }, { note: "B3", freq: 246.94 }, { note: "C4", freq: 261.63 },
-                { note: "C#4", freq: 277.18 }, { note: "D4", freq: 293.66 }, { note: "D#4", freq: 311.13 },
-                { note: "E4", freq: 329.63 }, { note: "F4", freq: 349.23 }, { note: "F#4", freq: 369.99 },
-                { note: "G4", freq: 392.00 }, { note: "G#4", freq: 415.30 }, { note: "A4", freq: 440.00 },
-                { note: "A#4", freq: 466.16 }, { note: "B4", freq: 493.88 }, { note: "C5", freq: 523.25 }
-            ];
-            return notes.reduce((prev, curr) => 
-                Math.abs(curr.freq - freq) < Math.abs(prev.freq - freq) ? curr : prev
-            );
-        }
+        createButtons();
     </script>
 </body>
 </html>
