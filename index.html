@@ -60,16 +60,10 @@
 </head>
 <body>
     <h1>Guitar Tuner</h1>
-    <p>Select tuning:</p>
-    <div class="tuning-buttons">
-        <button class="tuning-btn" data-tuning="standard">Standard</button>
-        <button class="tuning-btn" data-tuning="drop-d">Drop D</button>
-        <button class="tuning-btn" data-tuning="open-g">Open G</button>
-        <button class="tuning-btn" data-tuning="custom">Custom</button>
-    </div>
+    <button id="start-button">Start Tuner</button>
     
     <p id="note-display">-</p>
-    <p id="frequency-display">Listening...</p>
+    <p id="frequency-display">Waiting for sound...</p>
 
     <div id="tune-meter">
         <div id="needle"></div>
@@ -77,20 +71,14 @@
 
     <script>
         let audioContext, analyser, dataArray;
-        let selectedTuning = "standard";
-        let tuningFrequencies = {
-            "standard": [82.41, 110.00, 146.83, 196.00, 246.94, 329.63],
-            "drop-d": [73.42, 110.00, 146.83, 196.00, 246.94, 329.63],
-            "open-g": [73.42, 98.00, 146.83, 196.00, 246.94, 293.66],
-            "custom": [82.41, 110.00, 146.83, 196.00, 246.94, 329.63] // Default to standard
-        };
+        let isTuning = false;
 
-        document.querySelectorAll(".tuning-btn").forEach(btn => {
-            btn.addEventListener("click", () => {
-                selectedTuning = btn.dataset.tuning;
-                document.querySelectorAll(".tuning-btn").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
-            });
+        document.getElementById("start-button").addEventListener("click", async () => {
+            if (!isTuning) {
+                await startTuner();
+                isTuning = true;
+                document.getElementById("start-button").style.display = "none";
+            }
         });
 
         async function startTuner() {
@@ -108,28 +96,31 @@
             analyser.getFloatTimeDomainData(dataArray);
             let frequency = autoCorrelate(dataArray, audioContext.sampleRate);
             if (frequency > 0) updateUI(frequency);
+            else updateNoSound();
             requestAnimationFrame(detectPitch);
         }
 
         function updateUI(frequency) {
-            let note = findClosestNote(frequency);
-            let targetFrequency = note.frequency;
-            let diff = frequency - targetFrequency;
-            let offset = Math.max(-50, Math.min(50, (diff / targetFrequency) * 400));
-
-            document.getElementById("note-display").textContent = note.name;
             document.getElementById("frequency-display").textContent = `${frequency.toFixed(2)} Hz`;
-
+            let note = findClosestNote(frequency);
+            document.getElementById("note-display").textContent = note.name;
+            let diff = frequency - note.frequency;
+            let offset = Math.max(-50, Math.min(50, (diff / note.frequency) * 400));
             document.getElementById("needle").style.left = `${50 + offset}%`;
         }
 
+        function updateNoSound() {
+            document.getElementById("note-display").textContent = "-";
+            document.getElementById("frequency-display").textContent = "No sound detected...";
+        }
+
         function findClosestNote(frequency) {
-            let allFrequencies = tuningFrequencies[selectedTuning];
-            let closest = allFrequencies.reduce((prev, curr) =>
+            let standardFrequencies = [82.41, 110.00, 146.83, 196.00, 246.94, 329.63];
+            let noteNames = ["E2", "A2", "D3", "G3", "B3", "E4"];
+            let closest = standardFrequencies.reduce((prev, curr) =>
                 Math.abs(curr - frequency) < Math.abs(prev - frequency) ? curr : prev
             );
-            let noteNames = ["E2", "A2", "D3", "G3", "B3", "E4"];
-            let index = allFrequencies.indexOf(closest);
+            let index = standardFrequencies.indexOf(closest);
             return { frequency: closest, name: noteNames[index] || "Unknown" };
         }
 
@@ -158,8 +149,6 @@
             if (bestCorrelation > 0.9) return sampleRate / bestOffset;
             return -1;
         }
-
-        startTuner();
     </script>
 </body>
 </html>
