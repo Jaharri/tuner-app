@@ -60,7 +60,7 @@
     </div>
     <button onclick="startTuner()">Start Tuning</button>
     <script>
-        let audioContext, analyser, microphone, dataArray;
+        let audioContext, analyser, microphone, bufferLength, dataArray;
         const noteElement = document.getElementById("note");
         const statusElement = document.getElementById("status");
         const indicator = document.getElementById("indicator");
@@ -70,10 +70,11 @@
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
                 analyser.fftSize = 2048;
+                bufferLength = analyser.frequencyBinCount;
+                dataArray = new Float32Array(bufferLength);
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 microphone = audioContext.createMediaStreamSource(stream);
                 microphone.connect(analyser);
-                dataArray = new Uint8Array(analyser.fftSize);
                 detectPitch();
                 statusElement.textContent = "Listening...";
             } catch (err) {
@@ -83,12 +84,13 @@
         }
         
         function detectPitch() {
-            analyser.getByteTimeDomainData(dataArray);
-            let frequency = getPitchFromBuffer(dataArray);
-            if (frequency) {
+            analyser.getFloatFrequencyData(dataArray);
+            let maxIndex = dataArray.indexOf(Math.max(...dataArray));
+            let frequency = maxIndex * (audioContext.sampleRate / analyser.fftSize);
+            if (frequency > 20 && frequency < 5000) {
                 let closestNote = getClosestNote(frequency);
                 noteElement.textContent = closestNote.note;
-                let offset = ((frequency - closestNote.freq) / 10) * 50;
+                let offset = ((frequency - closestNote.freq) / closestNote.freq) * 50;
                 indicator.style.left = `${50 + offset}%`;
                 statusElement.textContent = "";
             } else {
@@ -97,24 +99,26 @@
             requestAnimationFrame(detectPitch);
         }
         
-        function getPitchFromBuffer(buffer) {
-            let maxVal = 0;
-            let maxIndex = 0;
-            for (let i = 0; i < buffer.length; i++) {
-                if (buffer[i] > maxVal) {
-                    maxVal = buffer[i];
-                    maxIndex = i;
-                }
-            }
-            let sampleRate = audioContext.sampleRate;
-            return sampleRate / maxIndex;
-        }
-        
         function getClosestNote(freq) {
             const notes = [
-                { note: "E2", freq: 82.41 }, { note: "A2", freq: 110.00 },
-                { note: "D3", freq: 146.83 }, { note: "G3", freq: 196.00 },
-                { note: "B3", freq: 246.94 }, { note: "E4", freq: 329.63 }
+                { note: "C0", freq: 16.35 }, { note: "C#0", freq: 17.32 }, { note: "D0", freq: 18.35 },
+                { note: "D#0", freq: 19.45 }, { note: "E0", freq: 20.60 }, { note: "F0", freq: 21.83 },
+                { note: "F#0", freq: 23.12 }, { note: "G0", freq: 24.50 }, { note: "G#0", freq: 25.96 },
+                { note: "A0", freq: 27.50 }, { note: "A#0", freq: 29.14 }, { note: "B0", freq: 30.87 },
+                { note: "C1", freq: 32.70 }, { note: "C#1", freq: 34.65 }, { note: "D1", freq: 36.71 },
+                { note: "D#1", freq: 38.89 }, { note: "E1", freq: 41.20 }, { note: "F1", freq: 43.65 },
+                { note: "F#1", freq: 46.25 }, { note: "G1", freq: 49.00 }, { note: "G#1", freq: 51.91 },
+                { note: "A1", freq: 55.00 }, { note: "A#1", freq: 58.27 }, { note: "B1", freq: 61.74 },
+                { note: "C2", freq: 65.41 }, { note: "C#2", freq: 69.30 }, { note: "D2", freq: 73.42 },
+                { note: "D#2", freq: 77.78 }, { note: "E2", freq: 82.41 }, { note: "F2", freq: 87.31 },
+                { note: "F#2", freq: 92.50 }, { note: "G2", freq: 98.00 }, { note: "G#2", freq: 103.83 },
+                { note: "A2", freq: 110.00 }, { note: "A#2", freq: 116.54 }, { note: "B2", freq: 123.47 },
+                { note: "C3", freq: 130.81 }, { note: "C#3", freq: 138.59 }, { note: "D3", freq: 146.83 },
+                { note: "D#3", freq: 155.56 }, { note: "E3", freq: 164.81 }, { note: "F3", freq: 174.61 },
+                { note: "F#3", freq: 185.00 }, { note: "G3", freq: 196.00 }, { note: "G#3", freq: 207.65 },
+                { note: "A3", freq: 220.00 }, { note: "A#3", freq: 233.08 }, { note: "B3", freq: 246.94 },
+                { note: "C4", freq: 261.63 }, { note: "C#4", freq: 277.18 }, { note: "D4", freq: 293.66 },
+                { note: "D#4", freq: 311.13 }, { note: "E4", freq: 329.63 }
             ];
             return notes.reduce((prev, curr) => 
                 Math.abs(curr.freq - freq) < Math.abs(prev.freq - freq) ? curr : prev
