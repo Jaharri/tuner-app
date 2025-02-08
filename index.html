@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guitar Tuner</title>
+    <title>Tuner</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -65,17 +65,16 @@
             notes.forEach(note => {
                 const button = document.createElement("button");
                 button.textContent = note;
-                button.onclick = () => toggleTone(baseFrequencies[note] * Math.pow(2, currentOctave));
+                button.onclick = () => toggleTone(note);
                 container.appendChild(button);
             });
         }
 
-        function toggleTone(frequency) {
+        function toggleTone(note) {
+            const frequency = baseFrequencies[note] * Math.pow(2, currentOctave);
             if (currentOscillator) {
                 currentOscillator.stop();
                 currentOscillator.disconnect();
-                currentOscillator = null;
-                return;
             }
             currentOscillator = audioContext.createOscillator();
             currentOscillator.type = "sine";
@@ -87,6 +86,10 @@
         function toggleOctave() {
             currentOctave = currentOctave === 0 ? 1 : 0;
             document.getElementById("octave-display").textContent = currentOctave;
+            if (currentOscillator) {
+                const note = notes.find(n => baseFrequencies[n] * Math.pow(2, currentOctave) === currentOscillator.frequency.value / Math.pow(2, currentOctave === 1 ? 0.5 : 2));
+                if (note) toggleTone(note);
+            }
         }
 
         let metronomeInterval;
@@ -112,7 +115,7 @@
             metronomeInterval = setInterval(() => {
                 let osc = audioContext.createOscillator();
                 osc.type = "sine";
-                osc.frequency.setValueAtTime(beat === 0 && document.getElementById("accent").checked ? 250 : 200, audioContext.currentTime);
+                osc.frequency.setValueAtTime(beat === 0 && document.getElementById("accent").checked ? 200 : 150, audioContext.currentTime);
                 osc.connect(audioContext.destination);
                 osc.start();
                 setTimeout(() => osc.stop(), 100);
