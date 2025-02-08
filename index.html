@@ -34,7 +34,7 @@
     </style>
 </head>
 <body>
-    <h1>Guitar Tuner</h1>
+    <h1>Tuner</h1>
     <label for="octave">Octave: </label>
     <span id="octave-display">0</span>
     <button onclick="toggleOctave()">Toggle Octave</button>
@@ -75,6 +75,10 @@
             if (currentOscillator) {
                 currentOscillator.stop();
                 currentOscillator.disconnect();
+                if (currentOscillator.frequency.value === frequency) {
+                    currentOscillator = null;
+                    return;
+                }
             }
             currentOscillator = audioContext.createOscillator();
             currentOscillator.type = "sine";
@@ -87,7 +91,8 @@
             currentOctave = currentOctave === 0 ? 1 : 0;
             document.getElementById("octave-display").textContent = currentOctave;
             if (currentOscillator) {
-                const note = notes.find(n => baseFrequencies[n] * Math.pow(2, currentOctave) === currentOscillator.frequency.value / Math.pow(2, currentOctave === 1 ? 0.5 : 2));
+                const currentFrequency = currentOscillator.frequency.value;
+                let note = Object.keys(baseFrequencies).find(n => baseFrequencies[n] * Math.pow(2, currentOctave) === currentFrequency * (currentOctave === 1 ? 2 : 0.5));
                 if (note) toggleTone(note);
             }
         }
