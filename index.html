@@ -82,7 +82,11 @@
             currentOscillator = audioContext.createOscillator();
             currentOscillator.type = "sine";
             currentOscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-            currentOscillator.connect(audioContext.destination);
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.5, audioContext.currentTime + 0.01);
+            currentOscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
             currentOscillator.start();
         }
 
@@ -125,11 +129,18 @@
 
             metronomeInterval = setInterval(() => {
                 let osc = audioContext.createOscillator();
+                let gainNode = audioContext.createGain();
                 osc.type = "sine";
                 osc.frequency.setValueAtTime(beat === 0 && document.getElementById("accent").checked ? 200 : 150, audioContext.currentTime);
-                osc.connect(audioContext.destination);
+                gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+                osc.connect(gainNode);
+                gainNode.connect(audioContext.destination);
                 osc.start();
-                setTimeout(() => osc.stop(), 100);
+                setTimeout(() => {
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.05);
+                    setTimeout(() => osc.stop(), 50);
+                }, 100);
                 beat = (beat + 1) % timeSignature;
             }, beatDuration);
         }
