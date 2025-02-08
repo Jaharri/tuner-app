@@ -36,7 +36,6 @@
 <body>
     <h1>Guitar Tuner</h1>
     <label for="octave">Octave: </label>
-    <button onclick="changeOctave(-1)">-</button>
     <span id="octave-display">0</span>
     <button onclick="changeOctave(1)">+</button>
     <div id="buttons"></div>
@@ -88,7 +87,7 @@
         }
 
         function changeOctave(direction) {
-            currentOctave = Math.max(-1, Math.min(1, currentOctave + direction));
+            currentOctave = Math.min(1, currentOctave + direction);
             document.getElementById("octave-display").textContent = currentOctave;
         }
 
@@ -103,8 +102,8 @@
 
             metronomeInterval = setInterval(() => {
                 let osc = audioContext.createOscillator();
-                osc.type = "square";
-                osc.frequency.setValueAtTime(beat === 0 && accent ? 1000 : 800, audioContext.currentTime);
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(beat === 0 && accent ? 500 : 400, audioContext.currentTime);
                 osc.connect(audioContext.destination);
                 osc.start();
                 setTimeout(() => osc.stop(), 100);
