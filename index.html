@@ -6,23 +6,47 @@
     <title>Chromatic Guitar Tuner</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-        #tuningStatus { font-size: 24px; font-weight: bold; }
-        select, button { font-size: 18px; margin: 10px; padding: 10px; }
+        .note-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 20px; }
+        button { font-size: 18px; padding: 10px; cursor: pointer; }
+        #tuningMeter { width: 100%; height: 20px; background: lightgray; position: relative; margin-top: 20px; }
+        #indicator { width: 10px; height: 20px; background: red; position: absolute; left: 50%; transform: translateX(-50%); }
     </style>
 </head>
 <body>
 
     <h1>Chromatic Guitar Tuner</h1>
+    <div class="note-buttons">
+        <button onclick="setTargetNote('C')">C</button>
+        <button onclick="setTargetNote('C#')">C#</button>
+        <button onclick="setTargetNote('D')">D</button>
+        <button onclick="setTargetNote('D#')">D#</button>
+        <button onclick="setTargetNote('E')">E</button>
+        <button onclick="setTargetNote('F')">F</button>
+        <button onclick="setTargetNote('F#')">F#</button>
+        <button onclick="setTargetNote('G')">G</button>
+        <button onclick="setTargetNote('G#')">G#</button>
+        <button onclick="setTargetNote('A')">A</button>
+        <button onclick="setTargetNote('A#')">A#</button>
+        <button onclick="setTargetNote('B')">B</button>
+    </div>
+
     <button onclick="startTuner()">Start Tuning</button>
 
+    <p id="selectedNote">Selected Note: --</p>
     <p id="frequency">Frequency: -- Hz</p>
-    <p id="note">Note: --</p>
-    <p id="tuningStatus">Waiting for input...</p>
+    <div id="tuningMeter"><div id="indicator"></div></div>
 
     <script>
-        let lastFrequencies = [];
-        const SMOOTHING_COUNT = 5; // Lower count for more stability
-        const STABLE_THRESHOLD = 5; // How many consecutive readings must be close
+        let targetNote = null;
+        const noteFrequencies = {
+            "C": 130.81, "C#": 138.59, "D": 146.83, "D#": 155.56, "E": 164.81, "F": 174.61,
+            "F#": 185.00, "G": 196.00, "G#": 207.65, "A": 220.00, "A#": 233.08, "B": 246.94
+        };
+
+        function setTargetNote(note) {
+            targetNote = note;
+            document.getElementById("selectedNote").innerText = `Selected Note: ${note}`;
+        }
 
         async function startTuner() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -34,7 +58,7 @@
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const analyser = audioContext.createAnalyser();
             const microphone = audioContext.createMediaStreamSource(stream);
-            analyser.fftSize = 4096; // Higher for better low-end detection
+            analyser.fftSize = 4096;
             microphone.connect(analyser);
             
             const buffer = new Float32Array(analyser.fftSize);
@@ -43,9 +67,8 @@
                 let frequency = getPitch(buffer, audioContext.sampleRate);
 
                 if (frequency > 50 && frequency < 1000) { 
-                    frequency = smoothFrequency(frequency);
                     document.getElementById("frequency").innerText = `Frequency: ${frequency.toFixed(2)} Hz`;
-                    updateTuningStatus(frequency);
+                    if (targetNote) updateTuningDisplay(frequency);
                 }
                 requestAnimationFrame(detectPitch);
             }
@@ -54,13 +77,6 @@
 
         function getPitch(buffer, sampleRate) {
             let size = buffer.length;
-            let rms = 0;
-            for (let i = 0; i < size; i++) {
-                rms += buffer[i] * buffer[i];
-            }
-            rms = Math.sqrt(rms / size);
-            if (rms < 0.01) return -1;
-
             let bestOffset = -1, bestCorrelation = 0;
             for (let offset = 50; offset < size / 2; offset++) {
                 let correlation = 0;
@@ -75,65 +91,19 @@
             return bestOffset > 0 ? sampleRate / bestOffset : -1;
         }
 
-        function smoothFrequency(freq) {
-            lastFrequencies.push(freq);
-            if (lastFrequencies.length > SMOOTHING_COUNT) lastFrequencies.shift();
+        function updateTuningDisplay(frequency) {
+            if (!targetNote) return;
 
-            let median = lastFrequencies.slice().sort((a, b) => a - b)[Math.floor(lastFrequencies.length / 2)];
-            let stableCount = lastFrequencies.filter(f => Math.abs(f - median) < 3).length;
+            let baseFreq = noteFrequencies[targetNote];
+            while (baseFreq * 2 <= 700) baseFreq *= 2; // Match closest octave for guitar tuning
 
-            return stableCount >= STABLE_THRESHOLD ? median : freq;
-        }
+            let diff = frequency - baseFreq;
+            let percent = Math.min(50, Math.max(-50, (diff / baseFreq) * 100));
 
-        const noteFrequencies = [
-            { note: "C", freq: 16.35 }, { note: "C#", freq: 17.32 }, { note: "D", freq: 18.35 }, { note: "D#", freq: 19.45 },
-            { note: "E", freq: 20.60 }, { note: "F", freq: 21.83 }, { note: "F#", freq: 23.12 }, { note: "G", freq: 24.50 },
-            { note: "G#", freq: 25.96 }, { note: "A", freq: 27.50 }, { note: "A#", freq: 29.14 }, { note: "B", freq: 30.87 }
-        ];
+            let indicator = document.getElementById("indicator");
+            indicator.style.left = `${50 + percent}%`;
 
-        function getClosestNote(frequency) {
-            let minDiff = Infinity;
-            let closestNote = "";
-            let targetFreq = 0;
-
-            for (let i = 0; i < 100; i++) {
-                let octave = Math.floor(i / 12);
-                let baseNote = noteFrequencies[i % 12];
-                let noteFreq = baseNote.freq * Math.pow(2, octave);
-                
-                let diff = Math.abs(frequency - noteFreq);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closestNote = baseNote.note + (octave + 1);
-                    targetFreq = noteFreq;
-                }
-            }
-            return { note: closestNote, frequency: targetFreq };
-        }
-
-        function updateTuningStatus(frequency) {
-            const { note, frequency: targetFreq } = getClosestNote(frequency);
-            document.getElementById("note").innerText = `Note: ${note}`;
-
-            const diff = frequency - targetFreq;
-            const tolerance = 2;
-
-            let statusText = "";
-            let statusColor = "black";
-
-            if (Math.abs(diff) <= tolerance) {
-                statusText = "✅ In Tune!";
-                statusColor = "green";
-            } else if (diff > 0) {
-                statusText = "⬇️ Tune Down";
-                statusColor = "red";
-            } else {
-                statusText = "⬆️ Tune Up";
-                statusColor = "red";
-            }
-
-            document.getElementById("tuningStatus").innerText = statusText;
-            document.getElementById("tuningStatus").style.color = statusColor;
+            indicator.style.background = Math.abs(diff) < 2 ? "green" : "red";
         }
     </script>
 
