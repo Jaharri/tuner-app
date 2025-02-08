@@ -42,6 +42,7 @@
             top: 0;
             left: 50%;
             transform: translateX(-50%);
+            transition: left 0.1s linear;
         }
         button {
             padding: 10px;
@@ -63,7 +64,9 @@
         const noteElement = document.getElementById("note");
         const statusElement = document.getElementById("status");
         const indicator = document.getElementById("indicator");
-        
+        let smoothingFactor = 0.8;
+        let lastFrequency = 0;
+
         async function startTuner() {
             try {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -81,11 +84,17 @@
                 console.error(err);
             }
         }
-        
+
         function detectPitch() {
             analyser.getFloatFrequencyData(dataArray);
             let maxIndex = dataArray.indexOf(Math.max(...dataArray));
             let frequency = maxIndex * (audioContext.sampleRate / analyser.fftSize);
+            
+            if (lastFrequency) {
+                frequency = lastFrequency * smoothingFactor + frequency * (1 - smoothingFactor);
+            }
+            lastFrequency = frequency;
+            
             if (frequency > 20 && frequency < 5000) {
                 let closestNote = getClosestNote(frequency);
                 noteElement.textContent = closestNote.note;
@@ -97,7 +106,7 @@
             }
             requestAnimationFrame(detectPitch);
         }
-        
+
         function getClosestNote(freq) {
             const notes = [
                 { note: "E2", freq: 82.41 }, { note: "F2", freq: 87.31 }, { note: "F#2", freq: 92.50 },
