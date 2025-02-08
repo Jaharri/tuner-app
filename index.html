@@ -80,7 +80,7 @@
             stopTone();
             currentNote = note;
             currentOscillator = audioContext.createOscillator();
-            currentOscillator.type = "sine";
+            currentOscillator.type = "triangle";
             currentOscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
             const gainNode = audioContext.createGain();
             gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
@@ -120,28 +120,32 @@
             startMetronome();
         }
 
-        function startMetronome() {
-            const bpm = parseInt(document.getElementById("bpm").value);
-            const beatDuration = 60000 / bpm;
-            const timeSignature = parseInt(document.getElementById("time-signature").value);
-            let beat = 0;
-            metronomePlaying = true;
+function startMetronome() {
+    const bpm = parseInt(document.getElementById("bpm").value);
+    const beatDuration = 60000 / bpm;
+    const timeSignature = parseInt(document.getElementById("time-signature").value);
+    let beat = 0;
+    metronomePlaying = true;
 
-            metronomeInterval = setInterval(() => {
-                let osc = audioContext.createOscillator();
-                let gainNode = audioContext.createGain();
-                osc.type = "sine";
-                osc.frequency.setValueAtTime(beat === 0 && document.getElementById("accent").checked ? 200 : 150, audioContext.currentTime);
-                gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
-                gainNode.gain.linearRampToValueAtTime(0.001, audioContext.currentTime + (beatDuration / 1000) - 0.01);
-                osc.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                osc.start();
-                osc.stop(audioContext.currentTime + (beatDuration / 1000));
-                beat = (beat + 1) % timeSignature;
-            }, beatDuration);
-        }
+    metronomeInterval = setInterval(() => {
+        let osc = audioContext.createOscillator();
+        let gainNode = audioContext.createGain();
+        osc.type = "triangle"; // Change from sine to triangle
+        osc.frequency.setValueAtTime(beat === 0 && document.getElementById("accent").checked ? 200 : 150, audioContext.currentTime);
+        
+        // Smooth volume transitions to reduce popping
+        gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.01); // Gradual fade in
+        gainNode.gain.linearRampToValueAtTime(0.001, audioContext.currentTime + (beatDuration / 1000) - 0.01); // Gradual fade out
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        osc.start();
+        osc.stop(audioContext.currentTime + (beatDuration / 1000)); // Stop smoothly
+        
+        beat = (beat + 1) % timeSignature;
+    }, beatDuration);
+}
 
         function updateMetronome() {
             if (metronomePlaying) {
